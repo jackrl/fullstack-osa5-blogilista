@@ -1,7 +1,9 @@
 import React from 'react'
 
 import Blog from './components/Blog'
+import BlogForm from './components/BlogForm'
 import Notification from './components/Notification'
+import Togglable from './components/Togglable'
 
 import blogService from './services/blogs'
 import loginService from './services/login'
@@ -25,8 +27,10 @@ class App extends React.Component {
   }
 
   componentDidMount() {
-    blogService.getAll().then(blogs =>
-      this.setState({ blogs })
+    blogService.getAll().then(blogs => {
+        blogs.sort((a, b) => b.likes - a.likes)
+        this.setState({ blogs })
+      }
     )
 
     const loggedUserJSON = window.localStorage.getItem('loggedBlogappUser')
@@ -100,6 +104,38 @@ class App extends React.Component {
     this.setState({ [event.target.name]: event.target.value })
   }
 
+  handleLike = (blog) => {
+    blogService
+      .like(blog)
+      .then(newBlog => {
+        const index = this.state.blogs.findIndex(b => b.id === newBlog.id)
+        const updatedBlogs = [...this.state.blogs]
+        const blog = updatedBlogs[index]
+        const updatedBlog = {...blog, likes: newBlog.likes}
+        updatedBlogs[index] = updatedBlog;
+        updatedBlogs.sort((a, b) => b.likes - a.likes)
+        this.setState({
+          blogs: updatedBlogs
+        })
+      })
+  }
+
+  handleDelete = (blog) => {
+    console.log('Delete being handled')
+    if(window.confirm(`delete '${blog.title}' by ${blog.author}`)) {
+      blogService
+        .remove(blog)
+        .then(() => {
+          const index = this.state.blogs.findIndex(b => b.id === blog.id)
+          const updatedBlogs = [...this.state.blogs]
+          updatedBlogs.splice(index, 1)
+          this.setState({
+            blogs: updatedBlogs
+          })
+        })
+    }
+  }
+
   render() {
     const loginForm = () => (
       <div>
@@ -134,6 +170,18 @@ class App extends React.Component {
       </div>
     )
 
+    const blogForm = () => (
+      <Togglable buttonLabel="new blog" ref={component => this.blogForm = component}>
+        <BlogForm
+          onSubmit={this.addBlog}
+          newBlogTitle={this.state.newBlogTitle}
+          newBlogAuthor={this.state.newBlogAuthor}
+          newBlogUrl={this.state.newBlogUrl}
+          handleChange={this.handleFieldChange}
+        />
+      </Togglable>
+    )
+
     const blogList = () => (
       <div>
         <h2>blogs</h2>
@@ -150,46 +198,19 @@ class App extends React.Component {
           </div>
         </form>
 
-        <div>
-          <h2>create new</h2>
-          
-          <form onSubmit={this.addBlog}>
-            <div>
-              title
-              <input
-                type="text"
-                name="newBlogTitle"
-                value={this.state.newBlogTitle}
-                onChange={this.handleFieldChange}
-              />
-            </div>
-            <div>
-              author
-              <input
-                type="text"
-                name="newBlogAuthor"
-                value={this.state.newBlogAuthor}
-                onChange={this.handleFieldChange}
-              />
-            </div>
-            <div>
-              url
-              <input
-                type="text"
-                name="newBlogUrl"
-                value={this.state.newBlogUrl}
-                onChange={this.handleFieldChange}
-              />
-            </div>
-            <button>create</button>
-          </form>
-        </div>
-
+        <br/>
+        {blogForm()}
         <br/>
 
         <div>
           {this.state.blogs.map(blog => 
-            <Blog key={blog.id} blog={blog}/>
+            <Blog
+              key={blog.id}
+              blog={blog}
+              user={this.state.user}
+              handleLike={this.handleLike}
+              handleDelete={this.handleDelete}
+            />
           )}
         </div>
       </div>
